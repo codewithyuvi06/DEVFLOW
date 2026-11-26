@@ -1,20 +1,9 @@
 
 import { useEffect, useState } from 'react'
-import {
-  Check,
-  Code2,
-  ExternalLink,
-  GitBranch,
-  GitCommitHorizontal,
-  Plus,
-  Search,
-  Star,
-} from 'lucide-react'
-
+import {Check, Code2, ExternalLink, GitBranch, GitCommitHorizontal, Plus, Search, Star,} from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import EmptyState from '../components/EmptyState'
 import { apiRequest } from '../services/api'
-
 
 type Repository = {
   _id: string
@@ -286,23 +275,31 @@ export default function RepositoriesPage() {
               </div>
 
               <div className="repo-side">
-                <span className="repo-updated">
-                  <GitCommitHorizontal size={14} />
-                  {repo.updated
-                    ? new Date(repo.updated).toLocaleDateString()
-                    : 'Recently synced'}
-                </span>
+  <span className="repo-updated">
+    <GitCommitHorizontal size={14} />
+    {repo.updated
+      ? new Date(repo.updated).toLocaleDateString()
+      : 'Recently synced'}
+  </span>
 
-                <a
-                  className="icon-button"
-                  href={repo.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Open ${repo.name} on GitHub`}
-                >
-                  <ExternalLink size={16} />
-                </a>
-              </div>
+  <button
+    className="button button-secondary"
+    onClick={() => handleSyncIssues(repo)}
+    disabled={syncingRepoId !== ''}
+  >
+    {syncingRepoId === repo._id ? 'Syncing...' : 'Sync Issues'}
+  </button>
+
+  <a
+    className="icon-button"
+    href={repo.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={`Open ${repo.name} on GitHub`}
+  >
+    <ExternalLink size={16} />
+  </a>
+</div>
             </article>
           ))
         ) : (
