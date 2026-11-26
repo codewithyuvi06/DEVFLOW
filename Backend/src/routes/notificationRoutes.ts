@@ -1,0 +1,1 @@
+import { Router } from 'express'; import { listNotifications, markAllRead, markRead } from '../controllers/notificationController'; import { requireAuth } from '../middleware/auth'; const router = Router(); router.use(requireAuth); router.get('/', listNotifications); router.patch('/read-all', markAllRead); router.patch('/:notificationId/read', markRead); export default router;

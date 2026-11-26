@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { addComment, createIssue, deleteIssue, listIssues, updateIssue } from '../controllers/issueController';
+import { requireAuth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { issueSchema } from '../validators/schemas';
+import { z } from 'zod';
+const router = Router(); router.use(requireAuth);
+router.get('/', listIssues); router.post('/', validate(issueSchema), createIssue);
+router.patch('/:issueId', updateIssue); router.delete('/:issueId', deleteIssue);
+router.post('/:issueId/comments', validate(z.object({ body: z.object({ body: z.string().trim().min(1).max(3000) }), query: z.any(), params: z.any() })), addComment);
+export default router;

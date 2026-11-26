@@ -1,0 +1,1 @@
+import { Router } from 'express'; import { listActivity } from '../controllers/activityController'; import { requireAuth } from '../middleware/auth'; const router = Router(); router.get('/', requireAuth, listActivity); export default router;

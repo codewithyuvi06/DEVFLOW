@@ -1,0 +1,7 @@
+import { z } from 'zod';
+const id = z.string().regex(/^[a-f\d]{24}$/i, 'Must be a valid ID');
+export const registerSchema = z.object({ body: z.object({ name: z.string().trim().min(2).max(80), email: z.string().trim().email().max(254), password: z.string().min(10).max(128) }), query: z.any(), params: z.any() });
+export const loginSchema = z.object({ body: z.object({ email: z.string().email(), password: z.string().min(1).max(128) }), query: z.any(), params: z.any() });
+export const projectSchema = z.object({ body: z.object({ name: z.string().trim().min(2).max(100), description: z.string().max(1000).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), status: z.enum(['On track','At risk','Planning']).optional(), teamId: id, members: z.array(id).optional(), dueDate: z.string().datetime().optional() }), query: z.any(), params: z.any() });
+export const issueSchema = z.object({ body: z.object({ title: z.string().trim().min(2).max(180), description: z.string().max(10000).optional(), projectId: id, status: z.enum(['Todo','In progress','In review','Done']).optional(), priority: z.enum(['Urgent','High','Medium','Low']).optional(), assigneeId: id.optional(), dueDate: z.string().datetime().optional(), labels: z.array(z.string().max(30)).optional() }), query: z.any(), params: z.any() });
+export const teamSchema = z.object({ body: z.object({ name: z.string().trim().min(2).max(80), description: z.string().max(500).optional() }), query: z.any(), params: z.any() });

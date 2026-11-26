@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { createTeam, inviteMember, listMembers, listTeams } from '../controllers/teamController';
+import { requireAuth } from '../middleware/auth';
+import { requireTeamRole } from '../middleware/teamAccess';
+import { validate } from '../middleware/validate';
+import { teamSchema } from '../validators/schemas';
+const router = Router(); router.use(requireAuth);
+router.get('/', listTeams); router.post('/', validate(teamSchema), createTeam);
+router.get('/:teamId/members', requireTeamRole(), listMembers);
+router.post('/:teamId/members', requireTeamRole('owner','admin'), inviteMember);
+export default router;

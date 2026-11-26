@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import { login, logout, me, register, updateProfile } from '../controllers/authController';
+import { requireAuth } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+import { loginSchema, registerSchema } from '../validators/schemas';
+const router = Router();
+router.post('/register', validate(registerSchema), register);
+router.post('/login', validate(loginSchema), login);
+router.post('/logout', logout);
+router.get('/me', requireAuth, me);
+router.patch('/me', requireAuth, updateProfile);
+export default router;
