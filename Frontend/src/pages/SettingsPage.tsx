@@ -103,14 +103,18 @@ disabled={saving || !name.trim()}>{saved ? <Check size={16}/> : <Save size={16}/
     <p>Repositories, pull requests, issues, and code activity.</p>
   </div>
 
-  <span className="integration-status">Not connected</span>
+  <span className="integration-status">
+  {user?.githubUsername
+    ? `Connected as @${user.githubUsername}`
+    : 'Not connected'}
+</span>
 
-  <button
-    className="button button-secondary button-small"
-    onClick={connectGitHub}
-  >
-    Connect
-  </button>
+<button
+  className="button button-secondary button-small"
+  onClick={connectGitHub}
+>
+  {user?.githubUsername ? 'Reconnect' : 'Connect'}
+</button>
 </div></>}
       {section === 'Security' && <><div className="settings-section-head"><h2>Security & access</h2><p>Account protection and workspace access controls.</p></div><div className="security-callout">
   <Shield size={20}/>

@@ -119,11 +119,13 @@ export default function IssuesPage() {
 
   
 async function handleStatusChange(
-  issue: Issue,
+  issue: Issue,   
   newStatus: Issue['status'],
 ) {
   try {
-    await updateBackendIssue(issue.backendId, {
+    if (!issue.backendId) return
+
+await updateBackendIssue(issue.backendId, {
       status: newStatus,
     })
 
@@ -364,14 +366,18 @@ async function handleStatusChange(
 <select
   className={`priority-label priority-text-${issue.priority.toLowerCase()}`}
   value={issue.priority}
-  onChange={(event) =>
+  onChange={(event) => {
+    if (!issue.backendId) return
+
     updateBackendIssue(issue.backendId, {
       priority: event.target.value as Priority,
-    }).then(() => loadData()).catch((error) => {
-      console.error('Failed to update issue priority:', error)
-      alert('Could not update issue priority.')
     })
-  }
+      .then(() => loadData())
+      .catch((error) => {
+        console.error('Failed to update issue priority:', error)
+        alert('Could not update issue priority.')
+      })
+  }}
 >
   <option value="Urgent">Urgent</option>
   <option value="High">High</option>

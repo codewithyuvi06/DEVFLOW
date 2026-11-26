@@ -26,7 +26,7 @@ export interface Project {
 
 export interface Issue {
   id: string
-  backendId: string
+  backendId?: string
   title: string
   project: string
   status: IssueStatus

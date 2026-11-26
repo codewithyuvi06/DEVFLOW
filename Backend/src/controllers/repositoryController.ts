@@ -5,11 +5,13 @@ import { User } from '../models/User';
 import { asyncHandler } from '../utils/asyncHandler';
 import { success } from '../utils/response';
 import { ApiError } from '../utils/apiError';
-import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls } from '../services/githubService';
+import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls, listGitHubIssues, } from '../services/githubService';
 import { logActivity } from '../services/activityService';
 import { signToken } from '../utils/token';
 import { setSessionCookie } from '../utils/cookies';
 import { env } from '../config/env';
+import { Project } from '../models/Project';
+import { Issue } from '../models/Issue';
 export const githubStart = asyncHandler(async (req, res) => {
  if (!githubOAuthConfigured()) throw new ApiError(503, 'GitHub OAuth is not configured. Add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to .env');
  const state = String(req.query.state ?? ''); if (!state || state.length < 16) throw new ApiError(400, 'OAuth state is required');
@@ -110,7 +112,32 @@ export const importRepositories = asyncHandler(async (req, res) => {
  if (!token) throw new ApiError(400, 'GitHub repository import requires a linked GitHub account and stored token. Reconnect GitHub after configuring OAuth; token persistence is intentionally not enabled by default for security.');
  const remoteRepos = await listGitHubRepos(token); const result = [];
  for (const r of remoteRepos) {
-  const repo = await Repository.findOneAndUpdate({ team: team._id, githubId: String(r.id) }, { team: team._id, addedBy: req.user!.id, githubId: String(r.id), fullName: r.full_name, name: r.name, url: r.html_url, description: r.description ?? '', defaultBranch: r.default_branch, isPrivate: r.private, language: r.language ?? '', stars: r.stargazers_count, syncedAt: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true }); result.push(repo);
+  const repo = await Repository.findOneAndUpdate({ team: team._id, githubId: String(r.id) }, { team: team._id, addedBy: req.user!.id, githubId: String(r.id), fullName: r.full_name, name: r.name, url: r.html_url, description: r.description ?? '', defaultBranch: r.default_branch, isPrivate: r.private, language: r.language ?? '', stars: r.stargazers_count, syncedAt: new Date() }, { upsert: true, new: true, setDefaultsOnInsert: true }); await Project.findOneAndUpdate(
+  {
+    team: team._id,
+    repository: repo._id,
+  },
+  {
+    $setOnInsert: {
+      name: repo.name,
+      description: repo.description || '',
+      color: '#700B97',
+      status: 'Planning',
+      progress: 0,
+      team: team._id,
+      owner: req.user!.id,
+      members: [req.user!.id],
+      repository: repo._id,
+    },
+  },
+  {
+    upsert: true,
+    new: true,
+    setDefaultsOnInsert: true,
+  },
+);
+
+result.push(repo);
  }
  success(res, result, 'Repositories synced');
 });
@@ -222,3 +249,94 @@ export const listPullRequests = asyncHandler(async (req, res) => {
  const teams = await Team.find({ 'members.user': req.user!.id }).select('_id'); const filter: Record<string, unknown> = { team: { $in: teams.map(t => t._id) } }; if (req.query.teamId) filter.team = req.query.teamId; if (req.query.state) filter.state = req.query.state;
  const prs = await PullRequest.find(filter).populate('repository', 'name fullName url').sort({ updatedAt: -1 }).limit(100); success(res, prs.map(pr => ({ ...pr.toObject(), id: pr.id })));
 });
+
+
+export const syncGitHubIssues = asyncHandler(async (req, res) => {
+  const repo = await Repository.findById(req.params.repositoryId);
+  if (!repo) throw new ApiError(404, 'Repository not found');
+
+  const team = await Team.findOne({
+    _id: repo.team,
+    'members.user': req.user!.id,
+  });
+
+  if (!team) throw new ApiError(403, 'Access denied');
+
+  const project = await Project.findOne({
+    team: repo.team,
+    repository: repo._id,
+  });
+
+  if (!project) {
+    throw new ApiError(404, 'DEVFLOW project linked to this repository was not found');
+  }
+
+  const user = await User.findById(req.user!.id).select('+githubAccessToken');
+  const token = (user as unknown as { githubAccessToken?: string } | null)
+    ?.githubAccessToken;
+
+  if (!token) {
+    throw new ApiError(400, 'Link a GitHub access token before syncing issues');
+  }
+
+  const githubIssues = await listGitHubIssues(repo.fullName, token);
+  const results = [];
+
+  for (const githubIssue of githubIssues) {
+    // GitHub's Issues API also returns pull requests.
+    if (githubIssue.pull_request) continue;
+
+    const githubId = String(githubIssue.id);
+
+    const existingIssue = await Issue.findOne({
+      project: project._id,
+      githubId,
+    });
+
+    const internalNumber = existingIssue
+      ? existingIssue.number
+      : (await Issue.countDocuments({ project: project._id })) + 1;
+
+    const savedIssue = await Issue.findOneAndUpdate(
+      {
+        project: project._id,
+        githubId,
+      },
+      {
+        $set: {
+          source: 'github',
+          githubId,
+          githubNumber: githubIssue.number,
+          githubUrl: githubIssue.html_url,
+          githubState: githubIssue.state,
+          githubAuthor: githubIssue.user.login,
+          githubCreatedAt: new Date(githubIssue.created_at),
+          githubUpdatedAt: new Date(githubIssue.updated_at),
+          githubLabels: githubIssue.labels.map(label => label.name),
+          title: githubIssue.title,
+          description: githubIssue.body ?? '',
+          syncedAt: new Date(),
+        },
+        $setOnInsert: {
+          number: internalNumber,
+          project: project._id,
+          team: repo.team,
+          reporter: req.user!.id,
+          status: 'Todo',
+          priority: 'Medium',
+          labels: [],
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+
+    results.push(savedIssue);
+  }
+
+  success(res, results, 'GitHub issues synced');
+});
+

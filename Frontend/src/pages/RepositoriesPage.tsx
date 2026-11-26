@@ -15,6 +15,7 @@ import PageHeader from '../components/PageHeader'
 import EmptyState from '../components/EmptyState'
 import { apiRequest } from '../services/api'
 
+
 type Repository = {
   _id: string
   id?: string
@@ -44,7 +45,7 @@ type ApiResponse<T> = {
 export default function RepositoriesPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All repositories')
-
+  const [syncingRepoId, setSyncingRepoId] = useState('')
   const [repos, setRepos] = useState<Repository[]>([])
   const [teamId, setTeamId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -118,6 +119,35 @@ export default function RepositoriesPage() {
       setImporting(false)
     }
   }
+
+  async function handleSyncIssues(repo: Repository) {
+  if (syncingRepoId) return
+
+  try {
+    setSyncingRepoId(repo._id)
+    setError('')
+    setMessage('')
+
+    const response = await apiRequest<ApiResponse<unknown[]>>(
+      `/repositories/${repo._id}/sync-issues`,
+      {
+        method: 'POST',
+      },
+    )
+
+    setMessage(
+      `Successfully synced ${response.data.length} GitHub issues from ${repo.name}.`,
+    )
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to synchronize GitHub issues.',
+    )
+  } finally {
+    setSyncingRepoId('')
+  }
+}
 
   const filtered = repos.filter(repo => {
     const matchesSearch =
