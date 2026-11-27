@@ -5,6 +5,13 @@ export interface BackendIssue {
   _id?: string
   id: string
   number?: number
+    source?: 'devflow' | 'github'
+  githubId?: string
+  githubNumber?: number
+  githubUrl?: string
+  githubState?: 'open' | 'closed'
+  githubAuthor?: string
+  githubLabels?: string[]
   title: string
   description?: string
   status: 'Todo' | 'In progress' | 'In review' | 'Done'

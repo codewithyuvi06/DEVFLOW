@@ -27,6 +27,8 @@ export interface Project {
 export interface Issue {
   id: string
   backendId?: string
+  source?: 'devflow' | 'github'
+  githubLabels?: string[]
   title: string
   project: string
   status: IssueStatus

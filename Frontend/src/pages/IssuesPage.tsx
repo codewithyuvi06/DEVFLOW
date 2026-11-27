@@ -53,9 +53,14 @@ function mapBackendIssue(issue: BackendIssue): Issue {
 
   return {
     backendId: issue._id || issue.id,
-    id: issue.number
-      ? `DEV-${issue.number}`
-      : `DEV-${issue.id.slice(-6).toUpperCase()}`,
+    source: issue.source || 'devflow',
+    githubLabels: issue.githubLabels || [],
+    id:
+      issue.source === 'github'
+        ? `GH-${issue.githubNumber ?? issue.number}`
+        : issue.number
+          ? `DEV-${issue.number}`
+          : `DEV-${issue.id.slice(-6).toUpperCase()}`,
     title: issue.title,
     project,
     status: issue.status,
@@ -329,8 +334,13 @@ await updateBackendIssue(issue.backendId, {
                           <CircleDot size={16} className="issue-circle" />
                           <div>
                             <span>{issue.id}</span>
+                            {issue.source === 'github' && (
+                              <span className="issue-source-badge">
+                                GitHub
+                              </span>
+                            )}
                             <strong>{issue.title}</strong>
-                          </div>
+                            </div>
                         </div>
                       </td>
 
