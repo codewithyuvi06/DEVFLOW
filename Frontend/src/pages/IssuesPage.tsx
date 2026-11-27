@@ -340,6 +340,15 @@ await updateBackendIssue(issue.backendId, {
                               </span>
                             )}
                             <strong>{issue.title}</strong>
+                            {issue.source === 'github' && (issue.githubLabels?.length ?? 0) > 0 && (
+                              <div className="github-issue-labels">
+                                {(issue.githubLabels ?? []).map((label) => (
+                                  <span key={label} className="github-issue-label">
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             </div>
                         </div>
                       </td>
