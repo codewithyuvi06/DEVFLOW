@@ -1,4 +1,4 @@
-
+import { syncRepositoryPullRequests } from '../services/pullRequests'
 import { useEffect, useState } from 'react'
 import {Check, Code2, ExternalLink, GitBranch, GitCommitHorizontal, Plus, Search, Star,} from 'lucide-react'
 import PageHeader from '../components/PageHeader'
@@ -35,6 +35,7 @@ export default function RepositoriesPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All repositories')
   const [syncingRepoId, setSyncingRepoId] = useState('')
+  const [syncingPRRepoId, setSyncingPRRepoId] = useState('')
   const [repos, setRepos] = useState<Repository[]>([])
   const [teamId, setTeamId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -135,6 +136,30 @@ export default function RepositoriesPage() {
     )
   } finally {
     setSyncingRepoId('')
+  }
+}
+
+async function handleSyncPullRequests(repo: Repository) {
+  if (syncingPRRepoId) return
+
+  try {
+    setSyncingPRRepoId(repo._id)
+    setError('')
+    setMessage('')
+
+    const data = await syncRepositoryPullRequests(repo._id)
+
+    setMessage(
+      `Successfully synced ${data.length} pull requests from ${repo.name}.`,
+    )
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to synchronize pull requests.',
+    )
+  } finally {
+    setSyncingPRRepoId('')
   }
 }
 
@@ -289,6 +314,16 @@ export default function RepositoriesPage() {
   >
     {syncingRepoId === repo._id ? 'Syncing...' : 'Sync Issues'}
   </button>
+
+  <button
+  className="button button-secondary"
+  onClick={() => handleSyncPullRequests(repo)}
+  disabled={syncingPRRepoId !== ''}
+>
+  {syncingPRRepoId === repo._id ? 'Syncing PRs...' : 'Sync PRs'}
+</button>
+
+
 
   <a
     className="icon-button"
