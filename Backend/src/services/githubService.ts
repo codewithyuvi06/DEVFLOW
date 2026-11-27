@@ -37,3 +37,58 @@ export async function listGitHubIssues(fullName: string, token: string) {
     token
   );
 }
+
+
+export async function listGitHubPRReviews(
+  fullName: string,
+  pullNumber: number,
+  token: string,
+) {
+  return githubFetch<Array<{
+    id: number;
+    user: { login: string } | null;
+    state: string;
+    body: string;
+    submitted_at: string | null;
+    html_url: string;
+  }>>(
+    `/repos/${fullName}/pulls/${pullNumber}/reviews?per_page=100`,
+    token,
+  );
+}
+
+export async function listGitHubPRReviewComments(
+  fullName: string,
+  pullNumber: number,
+  token: string,
+) {
+  return githubFetch<Array<{
+    id: number;
+    user: { login: string } | null;
+    body: string;
+    path: string;
+    line: number | null;
+    created_at: string;
+    html_url: string;
+  }>>(
+    `/repos/${fullName}/pulls/${pullNumber}/comments?per_page=100`,
+    token,
+  );
+}
+
+export async function listGitHubPRConversationComments(
+  fullName: string,
+  pullNumber: number,
+  token: string,
+) {
+  return githubFetch<Array<{
+    id: number;
+    user: { login: string } | null;
+    body: string;
+    created_at: string;
+    html_url: string;
+  }>>(
+    `/repos/${fullName}/issues/${pullNumber}/comments?per_page=100`,
+    token,
+  );
+}

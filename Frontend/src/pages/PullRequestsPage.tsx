@@ -1,17 +1,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
-import {
-  CheckCircle2,
-  GitPullRequest,
-  Search,
-  ShieldAlert,
-} from 'lucide-react'
+import { CheckCircle2, GitPullRequest, Search, ShieldAlert,} from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import EmptyState from '../components/EmptyState'
-import {
-  getPullRequests,
-  type BackendPullRequest,
-} from '../services/pullRequests'
+import { getPullRequests, syncPullRequestDetails, type BackendPullRequest, type PullRequestReview, type PullRequestComment, } from '../services/pullRequests'
 
 export default function PullRequestsPage() {
   const [pullRequests, setPullRequests] = useState<BackendPullRequest[]>([])
@@ -19,6 +11,34 @@ export default function PullRequestsPage() {
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedPR, setSelectedPR] = useState<string | null>(null)
+  const [reviews, setReviews] = useState<PullRequestReview[]>([])
+  const [comments, setComments] = useState<PullRequestComment[]>([])
+  const [reviewers, setReviewers] = useState<string[]>([])
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState('')
+
+  async function handleSyncDetails(prId: string) {
+  try {
+    setSelectedPR(prId)
+    setDetailsLoading(true)
+    setDetailsError('')
+
+    const data = await syncPullRequestDetails(prId)
+
+    setReviews(data.reviews)
+    setComments(data.comments)
+    setReviewers(data.reviewers)
+  } catch (err) {
+    setDetailsError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to load review details.',
+    )
+  } finally {
+    setDetailsLoading(false)
+  }
+}
 
   useEffect(() => {
     async function loadPullRequests() {
@@ -166,6 +186,16 @@ export default function PullRequestsPage() {
                 </div>
               </div>
 
+              <button
+                className="button button-secondary"
+                onClick={() => handleSyncDetails(pr._id)}
+                disabled={detailsLoading}
+              >
+                {detailsLoading && selectedPR === pr._id
+                  ? 'Syncing...'
+                  : 'Sync Reviews'}
+              </button>
+
               <a
                 className="button button-secondary review-button"
                 href={pr.url}
@@ -186,6 +216,67 @@ export default function PullRequestsPage() {
           />
         )}
       </div>
+
+      {selectedPR && (
+  <div className="pr-details-panel">
+    <h2>Pull Request Reviews</h2>
+
+    {detailsLoading ? (
+      <p>Loading review details...</p>
+    ) : detailsError ? (
+      <div className="inline-toast">{detailsError}</div>
+    ) : (
+      <>
+        <div>
+          <h3>Reviewers</h3>
+          {reviewers.length ? (
+            reviewers.map(reviewer => (
+              <span key={reviewer}>{reviewer} </span>
+            ))
+          ) : (
+            <p>No reviewers found.</p>
+          )}
+        </div>
+
+        <div>
+          <h3>Reviews</h3>
+          {reviews.length ? (
+            reviews.map(review => (
+              <article key={review._id}>
+                <strong>{review.reviewer}</strong>
+                <span> — {review.state}</span>
+                <p>{review.body || 'No review message.'}</p>
+                <a href={review.url} target="_blank" rel="noopener noreferrer">
+                  View on GitHub
+                </a>
+              </article>
+            ))
+          ) : (
+            <p>No reviews found.</p>
+          )}
+        </div>
+
+        <div>
+          <h3>Comments</h3>
+          {comments.length ? (
+            comments.map(comment => (
+              <article key={comment._id}>
+                <strong>{comment.commenter}</strong>
+                <p>{comment.body}</p>
+                {comment.path && <p>File: {comment.path}</p>}
+                <a href={comment.url} target="_blank" rel="noopener noreferrer">
+                  View on GitHub
+                </a>
+              </article>
+            ))
+          ) : (
+            <p>No comments found.</p>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+)}
 
       <div className="data-disclaimer">
         Pull request information is synchronized from your connected GitHub repositories.

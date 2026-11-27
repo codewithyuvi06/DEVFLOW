@@ -1,11 +1,13 @@
 import { Repository } from '../models/Repository';
 import { Team } from '../models/Team';
 import { PullRequest } from '../models/PullRequest';
+import { PullRequestReview } from '../models/PullRequestReview';
+import { PullRequestComment } from '../models/PullRequestComment';
 import { User } from '../models/User';
 import { asyncHandler } from '../utils/asyncHandler';
 import { success } from '../utils/response';
 import { ApiError } from '../utils/apiError';
-import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls, listGitHubIssues, } from '../services/githubService';
+import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls, listGitHubIssues, listGitHubPRReviews, listGitHubPRReviewComments, listGitHubPRConversationComments,} from '../services/githubService';
 import { logActivity } from '../services/activityService';
 import { signToken } from '../utils/token';
 import { setSessionCookie } from '../utils/cookies';
@@ -243,6 +245,127 @@ export const syncPullRequests = asyncHandler(async (req, res) => {
   }
 
   success(res, results, 'Pull requests synced');
+});
+
+export const syncPullRequestDetails = asyncHandler(async (req, res) => {
+  const pullRequest = await PullRequest.findById(req.params.pullRequestId);
+
+  if (!pullRequest) {
+    throw new ApiError(404, 'Pull request not found');
+  }
+
+  const repo = await Repository.findById(pullRequest.repository);
+
+  if (!repo) {
+    throw new ApiError(404, 'Repository not found');
+  }
+
+  const team = await Team.findOne({
+    _id: repo.team,
+    'members.user': req.user!.id,
+  });
+
+  if (!team) {
+    throw new ApiError(403, 'Access denied');
+  }
+
+  const user = await User.findById(req.user!.id).select('+githubAccessToken');
+  const token = (user as unknown as { githubAccessToken?: string } | null)
+    ?.githubAccessToken;
+
+  if (!token) {
+    throw new ApiError(400, 'Link a GitHub access token before syncing');
+  }
+
+  const [reviews, reviewComments, conversationComments] = await Promise.all([
+    listGitHubPRReviews(repo.fullName, pullRequest.number, token),
+    listGitHubPRReviewComments(repo.fullName, pullRequest.number, token),
+    listGitHubPRConversationComments(repo.fullName, pullRequest.number, token),
+  ]);
+
+  for (const review of reviews) {
+    await PullRequestReview.findOneAndUpdate(
+      {
+        pullRequest: pullRequest._id,
+        githubId: String(review.id),
+      },
+      {
+        reviewer: review.user?.login ?? '',
+        state: review.state,
+        body: review.body ?? '',
+        submittedAt: review.submitted_at
+          ? new Date(review.submitted_at)
+          : undefined,
+        url: review.html_url,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  for (const comment of reviewComments) {
+    await PullRequestComment.findOneAndUpdate(
+      {
+        pullRequest: pullRequest._id,
+        githubId: String(comment.id),
+        commentType: 'review',
+      },
+      {
+        commenter: comment.user?.login ?? '',
+        body: comment.body,
+        path: comment.path,
+        line: comment.line,
+        createdAtGitHub: new Date(comment.created_at),
+        url: comment.html_url,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  for (const comment of conversationComments) {
+    await PullRequestComment.findOneAndUpdate(
+      {
+        pullRequest: pullRequest._id,
+        githubId: String(comment.id),
+        commentType: 'conversation',
+      },
+      {
+        commenter: comment.user?.login ?? '',
+        body: comment.body,
+        createdAtGitHub: new Date(comment.created_at),
+        url: comment.html_url,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  const reviewers = [
+    ...new Set(
+      reviews
+        .map((review) => review.user?.login)
+        .filter((login): login is string => Boolean(login)),
+    ),
+  ];
+
+  pullRequest.reviewers = reviewers;
+  await pullRequest.save();
+
+    const savedReviews = await PullRequestReview.find({
+    pullRequest: pullRequest._id,
+  }).sort({ submittedAt: -1 });
+
+  const savedComments = await PullRequestComment.find({
+    pullRequest: pullRequest._id,
+  }).sort({ createdAtGitHub: -1 });
+
+  success(
+    res,
+    {
+      reviews: savedReviews,
+      comments: savedComments,
+      reviewers,
+    },
+    'Pull request details synced',
+  );
 });
 
 export const listPullRequests = asyncHandler(async (req, res) => {

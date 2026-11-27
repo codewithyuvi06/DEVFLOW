@@ -48,3 +48,42 @@ export async function syncRepositoryPullRequests(repositoryId: string) {
 
   return response.data
 }
+
+export interface PullRequestReview {
+  _id: string
+  reviewer: string
+  state: string
+  body: string
+  submittedAt?: string
+  url: string
+}
+
+export interface PullRequestComment {
+  _id: string
+  commenter: string
+  body: string
+  path: string
+  line: number | null
+  commentType: 'review' | 'conversation'
+  createdAtGitHub?: string
+  url: string
+}
+
+interface PullRequestDetailsResponse {
+  success: boolean
+  message: string
+  data: {
+    reviews: PullRequestReview[]
+    comments: PullRequestComment[]
+    reviewers: string[]
+  }
+}
+
+export async function syncPullRequestDetails(pullRequestId: string) {
+  const response = await apiRequest<PullRequestDetailsResponse>(
+    `/pull-requests/${pullRequestId}/sync-details`,
+    { method: 'POST' },
+  )
+
+  return response.data
+}
