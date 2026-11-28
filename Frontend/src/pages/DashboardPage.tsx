@@ -1,23 +1,12 @@
 
 import { useEffect, useState } from 'react'
-import {
-  ArrowRight,
-  ArrowUpRight,
-  CircleDot,
-  Clock3,
-  GitCommitHorizontal,
-  GitPullRequest,
-  Plus,
-  Sparkles,
-  Target,
-  TrendingUp,
-  Zap,
-} from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CircleDot, Clock3, GitCommitHorizontal, GitPullRequest, Plus, Sparkles, Target, TrendingUp, Zap, } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import ProjectCard from '../components/ProjectCard'
-import { activitySeed, issuesSeed } from '../data/mockData'
+import { getIssues } from '../services/issues'
+import type { BackendIssue } from '../services/issues'
 import { getDashboard } from '../services/dashboard'
 import type {
   DashboardActivity,
@@ -31,6 +20,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [projects, setProjects] = useState<DashboardProject[]>([])
   const [activities, setActivities] = useState<DashboardActivity[]>([])
+  const [issues, setIssues] = useState<BackendIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -42,7 +32,10 @@ export default function DashboardPage() {
         setLoading(true)
         setError('')
 
-        const response = await getDashboard()
+        const [response, issueData] = await Promise.all([
+          getDashboard(),
+          getIssues(),
+        ])
 
         if (!cancelled) {
           if (!response.success || !response.data) {
@@ -52,6 +45,7 @@ export default function DashboardPage() {
           setStats(response.data.stats)
           setProjects(response.data.projects ?? [])
           setActivities(response.data.activity ?? [])
+          setIssues(issueData)
         }
       } catch (err) {
         if (!cancelled) {
@@ -79,7 +73,7 @@ export default function DashboardPage() {
     setToast(`${project.name} selected — open its full workspace from Projects.`)
   }
 
-  const recentActivities = activities.length > 0 ? activities : activitySeed
+  const recentActivities = activities
 
   return (
     <div className="page-stack">
@@ -342,29 +336,39 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="issue-mini-list">
-            {issuesSeed
-              .filter(
-                (issue) =>
-                  issue.priority === 'Urgent' || issue.priority === 'High',
-              )
-              .slice(0, 4)
-              .map((issue) => (
-                <div className="issue-mini-row" key={issue.id}>
-                  <span
-                    className={`priority-mark priority-${issue.priority.toLowerCase()}`}
-                  />
-                  <div className="issue-mini-copy">
-                    <span>{issue.id}</span>
-                    <strong>{issue.title}</strong>
-                  </div>
-                  <span
-                    className={`issue-status status-${issue.status.toLowerCase().replace(' ', '-')}`}
-                  >
-                    {issue.status}
-                  </span>
-                </div>
-              ))}
-          </div>
+  {issues
+    .filter(
+      (issue) =>
+        issue.priority === 'Urgent' || issue.priority === 'High',
+    )
+    .sort((a, b) => {
+      const priorityOrder: Record<BackendIssue['priority'], number> = {
+        Urgent: 0,
+        High: 1,
+        Medium: 2,
+        Low: 3,
+      }
+
+      return priorityOrder[a.priority] - priorityOrder[b.priority]
+    })
+    .slice(0, 4)
+    .map((issue) => (
+      <div className="issue-mini-row" key={issue.id}>
+        <span
+          className={`priority-mark priority-${issue.priority.toLowerCase()}`}
+        />
+        <div className="issue-mini-copy">
+          <span>{issue.id}</span>
+          <strong>{issue.title}</strong>
+        </div>
+        <span
+          className={`issue-status status-${issue.status.toLowerCase().replace(' ', '-')}`}
+        >
+          {issue.status}
+        </span>
+      </div>
+    ))}
+</div>
         </div>
 
         <div className="panel insights-panel">
