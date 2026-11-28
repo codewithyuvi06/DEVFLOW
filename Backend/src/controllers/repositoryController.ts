@@ -3,11 +3,12 @@ import { Team } from '../models/Team';
 import { PullRequest } from '../models/PullRequest';
 import { PullRequestReview } from '../models/PullRequestReview';
 import { PullRequestComment } from '../models/PullRequestComment';
+import { PullRequestCheck } from '../models/PullRequestCheck';
 import { User } from '../models/User';
 import { asyncHandler } from '../utils/asyncHandler';
 import { success } from '../utils/response';
 import { ApiError } from '../utils/apiError';
-import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls, listGitHubIssues, listGitHubPRReviews, listGitHubPRReviewComments, listGitHubPRConversationComments,} from '../services/githubService';
+import { githubOAuthConfigured, exchangeGitHubCode, getGitHubUser, listGitHubRepos, listGitHubPulls, listGitHubIssues, listGitHubPRReviews, listGitHubPRReviewComments, listGitHubPRConversationComments, listGitHubCheckRuns,} from '../services/githubService';
 import { logActivity } from '../services/activityService';
 import { signToken } from '../utils/token';
 import { setSessionCookie } from '../utils/cookies';
@@ -184,8 +185,9 @@ export const syncPullRequests = asyncHandler(async (req, res) => {
       existingPR.author !== pr.user.login ||
       existingPR.url !== pr.html_url ||
       existingPR.baseBranch !== pr.base.ref ||
-      existingPR.headBranch !== pr.head.ref
-    );
+      existingPR.headBranch !== pr.head.ref ||
+      existingPR.headSha !== pr.head.sha
+);
 
     const hasStateChanged = existingPR && existingPR.state !== state;
 
@@ -203,6 +205,7 @@ export const syncPullRequests = asyncHandler(async (req, res) => {
         url: pr.html_url,
         baseBranch: pr.base.ref,
         headBranch: pr.head.ref,
+        headSha: pr.head.sha,
         syncedAt: new Date()
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -463,3 +466,87 @@ export const syncGitHubIssues = asyncHandler(async (req, res) => {
   success(res, results, 'GitHub issues synced');
 });
 
+export const syncPullRequestChecks = asyncHandler(async (req, res) => {
+  const pullRequest = await PullRequest.findById(req.params.pullRequestId);
+
+  if (!pullRequest) {
+    throw new ApiError(404, 'Pull request not found');
+  }
+
+  const repo = await Repository.findById(pullRequest.repository);
+
+  if (!repo) {
+    throw new ApiError(404, 'Repository not found');
+  }
+
+  const team = await Team.findOne({
+    _id: pullRequest.team,
+    'members.user': req.user!.id,
+  });
+
+  if (!team) {
+    throw new ApiError(403, 'Access denied');
+  }
+
+  const user = await User.findById(req.user!.id).select(
+    '+githubAccessToken',
+  );
+
+  const token = (
+    user as unknown as { githubAccessToken?: string } | null
+  )?.githubAccessToken;
+
+  if (!token) {
+    throw new ApiError(400, 'Link a GitHub access token before syncing checks');
+  }
+
+  if (!pullRequest.headSha) {
+    throw new ApiError(
+      400,
+      'Pull request has no commit SHA. Sync pull requests again.',
+    );
+  }
+
+  const result = await listGitHubCheckRuns(
+    repo.fullName,
+    pullRequest.headSha,
+    token,
+  );
+
+  for (const check of result.check_runs) {
+    await PullRequestCheck.findOneAndUpdate(
+      {
+        pullRequest: pullRequest._id,
+        githubId: String(check.id),
+      },
+      {
+        $set: {
+          name: check.name,
+          status: check.status,
+          conclusion: check.conclusion ?? '',
+          detailsUrl: check.html_url,
+          startedAt: check.started_at
+            ? new Date(check.started_at)
+            : undefined,
+          completedAt: check.completed_at
+            ? new Date(check.completed_at)
+            : undefined,
+        },
+      },
+      { upsert: true, new: true },
+    );
+  }
+
+  const savedChecks = await PullRequestCheck.find({
+    pullRequest: pullRequest._id,
+  }).sort({ createdAt: -1 });
+
+  success(
+    res,
+    {
+      checks: savedChecks,
+      total: result.total_count,
+    },
+    'Pull request checks synced',
+  );
+});

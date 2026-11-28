@@ -87,3 +87,32 @@ export async function syncPullRequestDetails(pullRequestId: string) {
 
   return response.data
 }
+
+export interface PullRequestCheck {
+  _id: string
+  githubId: string
+  name: string
+  status: string
+  conclusion: string
+  detailsUrl: string
+  startedAt?: string
+  completedAt?: string
+}
+
+interface PullRequestChecksResponse {
+  success: boolean
+  message: string
+  data: {
+    checks: PullRequestCheck[]
+    total: number
+  }
+}
+
+export async function syncPullRequestChecks(pullRequestId: string) {
+  const response = await apiRequest<PullRequestChecksResponse>(
+    `/pull-requests/${pullRequestId}/sync-checks`,
+    { method: 'POST' },
+  )
+
+  return response.data
+}

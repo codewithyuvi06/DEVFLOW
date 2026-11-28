@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, GitPullRequest, Search, ShieldAlert,} from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import EmptyState from '../components/EmptyState'
-import { getPullRequests, syncPullRequestDetails, type BackendPullRequest, type PullRequestReview, type PullRequestComment, } from '../services/pullRequests'
+import { getPullRequests, syncPullRequestDetails, syncPullRequestChecks, type BackendPullRequest, type PullRequestReview, type PullRequestComment, type PullRequestCheck, } from '../services/pullRequests'
 
 export default function PullRequestsPage() {
   const [pullRequests, setPullRequests] = useState<BackendPullRequest[]>([])
@@ -17,6 +17,9 @@ export default function PullRequestsPage() {
   const [reviewers, setReviewers] = useState<string[]>([])
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState('')
+  const [checks, setChecks] = useState<PullRequestCheck[]>([])
+  const [checksLoading, setChecksLoading] = useState(false)
+  const [checksError, setChecksError] = useState('')
 
   async function handleSyncDetails(prId: string) {
   try {
@@ -37,6 +40,26 @@ export default function PullRequestsPage() {
     )
   } finally {
     setDetailsLoading(false)
+  }
+}
+
+async function handleSyncChecks(prId: string) {
+  try {
+    setSelectedPR(prId)
+    setChecksLoading(true)
+    setChecksError('')
+
+    const data = await syncPullRequestChecks(prId)
+    
+    setChecks(data.checks)
+  } catch (err) {
+    setChecksError(
+      err instanceof Error
+        ? err.message
+        : 'Unable to load CI checks.',
+    )
+  } finally {
+    setChecksLoading(false)
   }
 }
 
@@ -194,6 +217,16 @@ export default function PullRequestsPage() {
                 {detailsLoading && selectedPR === pr._id
                   ? 'Syncing...'
                   : 'Sync Reviews'}
+              </button>
+
+              <button
+                className="button button-secondary"
+                onClick={() => handleSyncChecks(pr._id)}
+                disabled={checksLoading}
+              >
+                {checksLoading && selectedPR === pr._id
+                  ? 'Syncing...'
+                  : 'Sync Checks'}
               </button>
 
               <a

@@ -15,7 +15,7 @@ export async function githubFetch<T>(path: string, token: string): Promise<T> {
 }
 export async function getGitHubUser(token: string) { return githubFetch<{ id: number; login: string; name: string | null; email: string | null; avatar_url: string }>('/user', token); }
 export async function listGitHubRepos(token: string) { return githubFetch<Array<{ id: number; name: string; full_name: string; html_url: string; description: string | null; default_branch: string; private: boolean; language: string | null; stargazers_count: number }>>('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member', token); }
-export async function listGitHubPulls(fullName: string, token: string) { return githubFetch<Array<{ id: number; number: number; title: string; body: string | null; state: string; html_url: string; user: { login: string }; base: { ref: string }; head: { ref: string }; merged_at: string | null }>>(`/repos/${fullName}/pulls?state=all&per_page=50`, token); }
+export async function listGitHubPulls(fullName: string, token: string) { return githubFetch<Array<{ id: number; number: number; title: string; body: string | null; state: string; html_url: string; user: { login: string }; base: { ref: string }; head: { ref: string; sha: string; }; merged_at: string | null }>>(`/repos/${fullName}/pulls?state=all&per_page=50`, token); }
 
 
 export async function listGitHubIssues(fullName: string, token: string) {
@@ -89,6 +89,28 @@ export async function listGitHubPRConversationComments(
     html_url: string;
   }>>(
     `/repos/${fullName}/issues/${pullNumber}/comments?per_page=100`,
+    token,
+  );
+}
+
+export async function listGitHubCheckRuns(
+  fullName: string,
+  commitSha: string,
+  token: string,
+) {
+  return githubFetch<{
+    total_count: number;
+    check_runs: Array<{
+      id: number;
+      name: string;
+      status: string;
+      conclusion: string | null;
+      html_url: string;
+      started_at: string | null;
+      completed_at: string | null;
+    }>;
+  }>(
+    `/repos/${fullName}/commits/${commitSha}/check-runs?per_page=100`,
     token,
   );
 }
