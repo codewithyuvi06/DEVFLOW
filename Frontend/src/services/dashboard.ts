@@ -54,6 +54,8 @@ interface DashboardResponse {
   data: DashboardData
 }
 
-export function getDashboard() {
-  return apiRequest<DashboardResponse>('/dashboard')
+export type DashboardRange = '7days' | '30days' | 'all'
+
+export function getDashboard(range: DashboardRange = 'all') {
+  return apiRequest<DashboardResponse>(`/dashboard?range=${range}`)
 }

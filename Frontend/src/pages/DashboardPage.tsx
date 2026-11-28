@@ -12,10 +12,11 @@ import type {
   DashboardActivity,
   DashboardProject,
   DashboardStats,
+  DashboardRange,
 } from '../services/dashboard'
 
 export default function DashboardPage() {
-  const [range, setRange] = useState('7 days')
+  const [range, setRange] = useState<DashboardRange>('7days')
   const [toast, setToast] = useState('')
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [projects, setProjects] = useState<DashboardProject[]>([])
@@ -33,7 +34,7 @@ export default function DashboardPage() {
         setError('')
 
         const [response, issueData] = await Promise.all([
-          getDashboard(),
+          getDashboard(range),
           getIssues(),
         ])
 
@@ -67,7 +68,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [range])
 
   const handleOpenProject = (project: DashboardProject) => {
     setToast(`${project.name} selected — open its full workspace from Projects.`)
@@ -289,16 +290,22 @@ export default function DashboardPage() {
           </div>
           <div className="section-actions">
             <div className="segmented-control">
-              {['7 days', '30 days', 'All time'].map((item) => (
-                <button
-                  key={item}
-                  className={range === item ? 'selected' : ''}
-                  onClick={() => setRange(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+  {(
+    [
+      { label: '7 days', value: '7days' },
+      { label: '30 days', value: '30days' },
+      { label: 'All time', value: 'all' },
+    ] as const
+  ).map((item) => (
+    <button
+      key={item.value}
+      className={range === item.value ? 'selected' : ''}
+      onClick={() => setRange(item.value)}
+    >
+      {item.label}
+    </button>
+  ))}
+</div>
             <Link to="/projects" className="text-link">
               All projects <ArrowRight size={14} />
             </Link>
