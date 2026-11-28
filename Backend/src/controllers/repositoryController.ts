@@ -5,6 +5,7 @@ import { PullRequestReview } from '../models/PullRequestReview';
 import { PullRequestComment } from '../models/PullRequestComment';
 import { PullRequestCheck } from '../models/PullRequestCheck';
 import { User } from '../models/User';
+import { Notification } from '../models/Notification';
 import { asyncHandler } from '../utils/asyncHandler';
 import { success } from '../utils/response';
 import { ApiError } from '../utils/apiError';
@@ -350,7 +351,12 @@ export const syncPullRequestDetails = asyncHandler(async (req, res) => {
   ];
 
   pullRequest.reviewers = reviewers;
-  await pullRequest.save();
+
+if (!pullRequest.detailsSyncedAt) {
+  pullRequest.detailsSyncedAt = new Date();
+}
+
+await pullRequest.save();
 
     const savedReviews = await PullRequestReview.find({
     pullRequest: pullRequest._id,

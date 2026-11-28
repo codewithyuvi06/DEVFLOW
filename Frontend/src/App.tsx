@@ -2,7 +2,7 @@
 import { Navigate, Route, Routes, Outlet } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
-
+import NotificationsPage from './pages/NotificationsPage'
 import AppLayout from './components/AppLayout'
 import AuthPage from './pages/AuthPage'
 import DashboardPage from './pages/DashboardPage'
@@ -46,6 +46,7 @@ export default function App() {
           <Route path="/repositories" element={<RepositoriesPage />} />
           <Route path="/pull-requests" element={<PullRequestsPage />} />
           <Route path="/activity" element={<ActivityPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
